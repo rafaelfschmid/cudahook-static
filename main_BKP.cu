@@ -72,7 +72,6 @@ int main(int argc, char **argv) {
 	 *
 	 */
 	while(std::getline(std::cin, line) ) {
-		std::cout << line.data() << "\n";
 		exec(line.data());
 	}
 

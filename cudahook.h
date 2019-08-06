@@ -9,6 +9,9 @@
 
 #include <boost/interprocess/managed_shared_memory.hpp>
 #include <boost/interprocess/containers/map.hpp>
+#include <boost/interprocess/containers/string.hpp>
+#include <boost/interprocess/allocators/allocator.hpp>
+#include <boost/unordered_map.hpp>
 
 #include <mutex>              // std::mutex, std::unique_lock
 #include <condition_variable> // std::condition_variable
@@ -26,15 +29,11 @@
 #include <signal.h>
 #include <string.h>
 
-
-
-
 namespace bip = boost::interprocess;
 
 typedef struct {
-	const char* entry;
+	char* entry;
 	int id = -1;
-	int pid = -1;
 	//dim3 gridDim;
 	//dim3 blockDim;
 	int numOfBlocks;
@@ -42,16 +41,19 @@ typedef struct {
 	int numOfRegisters;
 	int sharedDynamicMemory;
 	int sharedStaticMemory;
-	//int computationalTime;
 	cudaStream_t stream;
+	float microseconds;
 	bool start = false;
-	bool finished = false;
-	//std::list<void *> args;
 } kernelInfo_t;
 
 kernelInfo_t &kernelInfo() {
 	static kernelInfo_t _kernelInfo;
 	return _kernelInfo;
+}
+
+std::map<const char *, char *> &kernelsMap() {
+  static std::map<const char*, char*> _kernels;
+  return _kernels;
 }
 
 /*std::vector<kernelInfo_t> &kernels() {
@@ -76,14 +78,18 @@ std::vector<deviceInfo_t> &devices() {
 	return _devices;
 }
 
-typedef int    KeyType;
-typedef kernelInfo_t  MappedType;
-typedef std::pair<const int, kernelInfo_t> ValueType;
+typedef bip::allocator<char, bip::managed_shared_memory::segment_manager> CharAllocator;
+typedef bip::basic_string<char, std::char_traits<char>, CharAllocator> ShmemString;
+
+
+typedef ShmemString MapKey;
+typedef kernelInfo_t MapValue;
+
+typedef std::pair< MapKey, MapValue> ValueType;
 
 //allocator of for the map.
-typedef bip::allocator<ValueType, bip::managed_shared_memory::segment_manager> ShmemAllocator;
-//third parameter argument is the ordering function is used to compare the keys.
-typedef bip::map<int, kernelInfo_t, std::less<int>, ShmemAllocator> SharedMap;
+typedef bip::allocator<ValueType, bip::managed_shared_memory::segment_manager> ShMemAllocator;
+typedef boost::unordered_map< MapKey, MapValue, boost::hash<MapKey>, std::equal_to<MapKey>, ShMemAllocator > SharedMap;
 
-typedef std::condition_variable ConditionVariable;
-typedef std::mutex Mutex;
+
+
