@@ -147,120 +147,31 @@ void printDevices() {
 	}
 }*/
 
-//void knapsack(std::vector<std::vector<int>>& tab, int itens, int pesoTotal){
-/*void knapsack(int ** tab, SharedMap* kernels, int itens, int pesoTotal){
-
-	int item = 1;
-	for(SharedMap::iterator iter = kernels->begin(); iter != kernels->end(); iter++)
-	{
-		for(int peso = 1; peso <= pesoTotal; peso++) {
-			if(iter->second.start == true) {
-				tab[item][peso] = tab[item-1][peso];
-			}
-			else {
-				int pesoi = iter->second.numOfThreads;
-				if(pesoi <= peso) {
-					if(pesoi + tab[item-1][peso-pesoi] > tab[item-1][peso]) {
-						tab[item][peso] = pesoi + tab[item-1][peso-pesoi];
-					}
-					else
-						tab[item][peso] = tab[item-1][peso];
-				}
-				else {
-					tab[item][peso] = tab[item-1][peso];
-				}
-			}
-		}
-		item++;
-
-	}
-}
-
-//void fill(int **tab, SharedMap* kernels, int itens, int pesoTotal, std::vector<std::string>& resp){
-void fill(int **tab, SharedMap* kernels, int itens, int pesoTotal, std::vector<MapKey>& resp){
-
-	SharedMap::iterator iter = kernels->end();
-
-	// se já calculamos esse estado da dp, retornamos o resultado salvo
-	while(itens > 0 && pesoTotal > 0) {
-		if(tab[itens][pesoTotal] != tab[itens-1][pesoTotal])
-		{
-			pesoTotal = pesoTotal - iter->second.numOfThreads;
-			//printf("iter->first=%d\n", iter->first);
-			resp.push_back(iter->first);
-		}
-		itens--;
-	}
-
-}*/
-
-//void schedule(SharedMap* kernels, std::vector<std::string>& resp) {
-/*void schedule(SharedMap* kernels, std::vector<MapKey>& resp) {
-	cudaDeviceProp prop;
-	cudaGetDeviceProperties(&prop, 0);
-
-	int peso = prop.maxThreadsPerMultiProcessor;
-	int itens = kernels->size();
-
-	int **tab = new int*[itens+1];
-	for(int i = 0; i <= itens; i++) {
-		tab[i] = new int[peso+1];
-	}
-
-	for(int i = 0; i <= itens; i++) {
-		tab[i][0] = 0;
-	}
-
-	for(int j = 0; j <= peso; j++) {
-		tab[0][j] = 0;
-	}
-
-	knapsack(tab, kernels, itens, peso);
-
-	for(int i = 0; i <= itens; i++) {
-		for(int j = 0; j <= peso; j++) {
-			printf("%d ", tab[i][j]);
-		}
-		printf("\n");
-	}
-
-	fill(tab, kernels, itens, peso, resp);
-
-	for(int j = 0; j <= itens; j++) {
-		delete[] tab[j];
-	}
-	delete[] tab;
-}*/
-
-extern "C" bool scheduleKernels(int num_streams) {
+/*extern "C" bool scheduleKernels(int num_streams) {
 	bip::managed_shared_memory segment(bip::open_only, "shared_memory");
 
 	SharedMap* kernels = segment.find<SharedMap>("Kernels").first;
-
-	cudaStream_t* streams = new cudaStream_t[num_streams];
-	for (int i = 0; i < num_streams; i++) {
-		cudaStreamCreate(&streams[i]);
-	}
+	cudaStream_t * streams = segment.find<cudaStream_t>("Streams").first;
 
 	int s = 0;
 	int count = 0;
-	while(count < kernels->size()) {
-		std::vector<MapKey> resp;
-		//std::vector<std::string> resp;
 
-		//schedule(kernels, resp);
-
-		for(MapKey& i : resp) {
-			kernels->at(i).stream = streams[s];
-			s = (s+1) % num_streams;
-			count++;
-		}
+	for(auto k : kernels) {
+		k.stream = streams[s];
+		s = (s+1) % num_streams;
+		count++;
+	}
 
 		s=0;
 	}
 
 	cudaFree(streams);
 	return true;
+}*/
+
+std::string &kernelName() {
+  static std::string _kernelName;
+  return _kernelName;
 }
 
 typedef cudaError_t (*cudaConfigureCall_t)(dim3, dim3, size_t, cudaStream_t);
@@ -270,16 +181,36 @@ extern "C" cudaError_t cudaConfigureCall(dim3 gridDim, dim3 blockDim, size_t sha
 	if(DEBUG)
 		printf("TESTE 1\n");
 
-	kernelInfo().sharedDynamicMemory = sharedMem;
-	kernelInfo().numOfThreads = blockDim.x * blockDim.y * blockDim.z;
-	kernelInfo().numOfBlocks = gridDim.x * gridDim.y * gridDim.z;
+	bip::managed_shared_memory segment(bip::open_only, "shared_memory");
 
-	//std::this_thread::sleep_for(std::chrono::seconds(2));
+	SharedMap* kernels = segment.find<SharedMap>("Kernels").first;
+	cudaStream_t* streams = segment.find<cudaStream_t>("Streams").first;
+
+	/*for(SharedMap::iterator iter = kernels->begin(); iter != kernels->end(); iter++)
+	{
+		printf("%s --- %s\n", iter->first.data(), iter->second);
+	}*/
+
+
+	int* 	   index 	= segment.find<int>("Index").first;
+	int id = *index = (*index) + 1;
+
+	std::string s(kernelName() + std::to_string(id));
+	CharAllocator alloc(segment.get_allocator<char>());
+	ShmemString str(s.data(), alloc);
+
+	cudaStream_t aux = kernels->at(str);
+	//cudaStream_t aux = kernels->at(str);
+	//ShmemString str(s.data(), alloc);
+	//kernels->insert(ValueType(str, k));
+
 	if (realCudaConfigureCall == NULL)
 		realCudaConfigureCall = (cudaConfigureCall_t) dlsym(RTLD_NEXT, "cudaConfigureCall");
 
 	assert(realCudaConfigureCall != NULL && "cudaConfigureCall is null");
-	return realCudaConfigureCall(gridDim, blockDim, sharedMem, stream);
+
+	//return realCudaConfigureCall(gridDim, blockDim, sharedMem, stream);
+	return realCudaConfigureCall(gridDim, blockDim, sharedMem, aux);
 
 }
 
@@ -288,41 +219,27 @@ static cudaLaunch_t realCudaLaunch = NULL;
 
 extern "C" cudaError_t cudaLaunch(const char *entry) {
 
-	cudaFuncAttributes attr;
-	cudaFuncGetAttributes(&attr, (void*) entry);
-
-	bip::managed_shared_memory segment(bip::open_only, "shared_memory");
-
-	SharedMap* 			kernels = segment.find<SharedMap>("Kernels").first;
-	int* 				index 	= segment.find<int>("Index").first;
-
-	kernelInfo_t k;
-	k.sharedDynamicMemory = kernelInfo().sharedDynamicMemory;
-	k.numOfThreads = kernelInfo().numOfThreads;
-	k.numOfBlocks = kernelInfo().numOfBlocks;
-	k.numOfRegisters = attr.numRegs;
-	k.sharedStaticMemory = attr.sharedSizeBytes;
-	k.start = false;
-	k.id = *index = (*index) + 1;
+	if(DEBUG)
+		printf("TESTE 3\n");
 
 	if (realCudaLaunch == NULL) {
 		realCudaLaunch = (cudaLaunch_t) dlsym(RTLD_NEXT, "cudaLaunch");
 	}
 	assert(realCudaLaunch != NULL && "cudaLaunch is null");
 
-    auto start = std::chrono::high_resolution_clock::now();
+    //auto start = std::chrono::high_resolution_clock::now();
     cudaError_t ret = realCudaLaunch(entry);
-	auto finish = std::chrono::high_resolution_clock::now();
+	/*auto finish = std::chrono::high_resolution_clock::now();
 	auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(finish-start);
 	//printf("microseconds=%d µs\n", microseconds.count());
-	printf("%d\n", microseconds.count());
+	//printf("microseconds=%d\n", microseconds.count());
 
 	k.microseconds = (float)microseconds.count();
 
 	CharAllocator alloc(segment.get_allocator<char>());
 	std::string s(kernelsMap()[entry] + std::to_string(k.id));
 	ShmemString str(s.data(), alloc);
-	kernels->insert(ValueType(str, k));
+	kernels->insert(ValueType(str, k));*/
 
 	return ret;
 }
@@ -335,8 +252,11 @@ extern "C" void __cudaRegisterFunction(void **fatCubinHandle,
 		const char *hostFun, char *deviceFun, const char *deviceName,
 		int thread_limit, uint3 *tid, uint3 *bid, dim3 *bDim, dim3 *gDim,
 		int *wSize) {
+	if(DEBUG)
+		printf("TESTE 0n");
 
 	kernelsMap()[hostFun] = deviceFun;
+	kernelName() = deviceFun;
 
 	if (realCudaRegisterFunction == NULL) {
 		realCudaRegisterFunction = (cudaRegisterFunction_t) dlsym(RTLD_NEXT,

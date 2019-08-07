@@ -3,6 +3,7 @@
 //#include <cuda.h>
 //#include <cuda_profiler_api.h>
 #include <iostream>
+#include <fstream>
 
 #include <vector>
 #include <thread>
@@ -35,13 +36,24 @@ my_lib_t hMyLib = NULL;
 scheduleKernels_t scheduleKernels = NULL;
 
 void callcudahook(int streams) {
-  if (!(hMyLib = MyLoadLib("/home/rafael/cuda-workspace/cudahook-static/libcudahook.so"))) { /*error*/ }
+  if (!(hMyLib = MyLoadLib("/home/rafael/cuda-workspace/cudahook-static/src/libcudahook.so"))) { /*error*/ }
   if (!(scheduleKernels = (scheduleKernels_t)MyLoadProc(hMyLib, "scheduleKernels"))) { /*error*/ }
 
   bool ret = scheduleKernels(streams);
 
   MyUnloadLib(hMyLib);
 }
+
+/*std::map<std::string, cudaStream_t> &streams() {
+  static std::map<std::string, cudaStream_t> _streams;
+  return _streams;
+}*/
+
+struct Application {
+	std::string command = "";
+	std::map<std::string, int> _kernels;
+	int time = 0;
+};
 
 
 void exec(const char* s){
@@ -55,52 +67,102 @@ int main(int argc, char **argv) {
 
 	// Index of threads
 	int *id = segment.construct<int>("Index")(-1);
-	// Shared map of kernels
-	//SharedMap *kernels =  segment.construct<SharedMap>("Kernels") (std::less<MapKey>() ,segment.get_segment_manager());
-
-
 	SharedMap *kernels = segment.construct<SharedMap>("Kernels")( 3, boost::hash<ShmemString>(), std::equal_to<ShmemString>()
 	        , segment.get_allocator<SharedMap>());
 
-	std::string line = "";
-	//std::string line2 = "";
-	/*std::getline (std::cin, line1);
-	exec(line1.data());
-	std::getline (std::cin, line2);
-	exec(line2.data());*/
-	/*
-	 *
-	 */
-	while(std::getline(std::cin, line) ) {
-		std::cout << line.data() << "\n";
-		exec(line.data());
+	int numOfStreams = 4;
+	cudaStream_t* streams = segment.construct<cudaStream_t>("Streams")[numOfStreams]();//;
+
+	//callcudahook(numOfStreams);
+
+	std::ifstream f_in;
+	f_in.open("../utils/kernels.txt");
+
+	if (!f_in) {
+	    std::cout << "Unable to open file ";
+	    exit(1);   // call system to stop
 	}
 
-	for(SharedMap::iterator iter = kernels->begin(); iter != kernels->end(); iter++)
-	{
-		printf("k.id=%d --- %s --- %f\n", iter->second.id, iter->first.data(), iter->second.microseconds);
+	std::vector<Application> commands;
+
+	std::string line = " ";
+	while(std::getline(f_in, line)) {
+		//std::string command = line;
+		Application app;
+		app.command = line;
+
+		//std::cout << command << "\n"; //printf teste
+		f_in >> line;
+		int count = std::stoi(line);
+		for(int i = 0; i < count; i++) {
+			f_in >> line;
+			int id = std::stoi(line);
+			//std::cout << id << " "; //printf teste
+			f_in >> line;
+			std::string kernel = line;
+			//std::cout << kernel << " "; //printf teste
+			f_in >> line;
+			int time = std::stoi(line);
+			//std::cout << time << "\n"; //printf teste
+
+			app._kernels.insert(std::make_pair(kernel, time));
+			app.time += time;
+		}
+
+		commands.push_back(app);
+
+		std::getline(f_in, line);
 	}
 
-	//callcudahook(2);
 
-	/*
-	 * Concurrent execution
-	 */
-	/*std::vector<std::future<void>> vec;
-	std::getline (std::cin, line1);
-	vec.push_back(std::async(std::launch::async,exec,line1.data()));
+/*	for(Application app : commands){
+		std::cout << app.command << "\n";
 
-	std::getline (std::cin, line2);
-	vec.push_back(std::async(std::launch::async,exec,line2.data()));*/
-
-/*	printf("começoooouuuu\n");
-	bool test = callcudahook(2, 2);
-	printf("acaboooouuuu\n");
-
-	vec[0].get();
-	vec[1].get();
-	vec[2].get();
+		for(auto& t : app._kernels)
+		{
+			std::cout << t.first << " " << t.second << "\n";
+		}
+		std::cout << "Tempo total = " << app.time << "\n";
+	}
 */
+
+	streams = segment.find<cudaStream_t>("Streams").first;
+	kernels = segment.find<SharedMap>("Kernels").first;
+
+	for (int i = 0; i < numOfStreams; i++) {
+		cudaStreamCreate(&streams[i]);
+	}
+
+	for(Application app : commands){
+		int streamId = 0;
+		for(auto& t : app._kernels)
+		{
+			CharAllocator alloc(segment.get_allocator<char>());
+			std::string s(t.first);
+			ShmemString str(s.data(), alloc);
+			kernels->insert(ValueType(str, streams[streamId]));
+		}
+
+		streamId = (streamId+1) % numOfStreams;
+	}
+
+	/*for(SharedMap::iterator iter = kernels->begin(); iter != kernels->end(); iter++)
+	{
+		printf("%s --- %s\n", iter->first.data(), iter->second);
+	}*/
+
+
+	std::vector<std::future<void>> vec;
+	//for(Application app : commands){
+	for(int k = 0; k < commands.size(); k++ ){
+		std::cout << commands[k].command << "\n";
+		//exec(app.command.data());
+		vec.push_back(std::async(std::launch::async,exec,commands[k].command.data()));
+	}
+
+	for(auto& k : vec){
+		k.get();
+	}
 
 
 	bip::shared_memory_object::remove("shared_memory");

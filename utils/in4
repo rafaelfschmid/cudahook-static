@@ -1,0 +1,2 @@
+$RODINIA/cuda/pathfinder/pathfinder 100000 100 20 > result.txt
+ 

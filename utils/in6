@@ -1,0 +1,2 @@
+$RODINIA/cuda/kmeans/kmeans -o -i $RODINIA/data/kmeans/kdd_cup
+ 

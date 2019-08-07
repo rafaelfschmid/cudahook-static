@@ -1,0 +1,2 @@
+$RODINIA/cuda/hotspot3D/3D 512 8 100 $RODINIA/data/hotspot3D/power_512x8 $RODINIA/data/hotspot3D/temp_512x8 output.out
+ 

@@ -1,0 +1,2 @@
+$RODINIA/cuda/heartwall/heartwall $RODINIA/data/heartwall/test.avi 20
+ 

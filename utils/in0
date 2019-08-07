@@ -1,0 +1,2 @@
+$RODINIA/cuda/lud/cuda/lud_cuda -s 256
+ 
