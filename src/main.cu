@@ -17,6 +17,9 @@
 #include "cudahook.h"
 #include "Scheduler.h"
 
+#include <omp.h>
+#include <mpi.h>
+
 typedef void* my_lib_t;
 
 my_lib_t MyLoadLib(const char* szMyLib) {
@@ -70,13 +73,14 @@ int main(int argc, char **argv) {
 	SharedMap *kernels = segment.construct<SharedMap>("Kernels")( 3, boost::hash<ShmemString>(), std::equal_to<ShmemString>()
 	        , segment.get_allocator<SharedMap>());
 
-	int numOfStreams = 4;
-	cudaStream_t* streams = segment.construct<cudaStream_t>("Streams")[numOfStreams]();//;
+	int numOfStreams = 1;
+	//cudaStream_t* streams = segment.construct<cudaStream_t>("Streams")[numOfStreams]();//;
+	cudaStream_t* streams = segment.construct<cudaStream_t>("Streams")();//;
 
 	//callcudahook(numOfStreams);
 
 	std::ifstream f_in;
-	f_in.open("../utils/kernels.txt");
+	f_in.open("../utils/kernel.txt");
 
 	if (!f_in) {
 	    std::cout << "Unable to open file ";
@@ -126,12 +130,14 @@ int main(int argc, char **argv) {
 	}
 */
 
-	streams = segment.find<cudaStream_t>("Streams").first;
+//	streams = segment.find<cudaStream_t>("Streams").first;
 	kernels = segment.find<SharedMap>("Kernels").first;
 
-	for (int i = 0; i < numOfStreams; i++) {
+/*	for (int i = 0; i < numOfStreams; i++) {
 		cudaStreamCreate(&streams[i]);
 	}
+
+
 
 	for(Application app : commands){
 		int streamId = 0;
@@ -140,28 +146,61 @@ int main(int argc, char **argv) {
 			CharAllocator alloc(segment.get_allocator<char>());
 			std::string s(t.first);
 			ShmemString str(s.data(), alloc);
+			//kernels->insert(ValueType(str, &streams[streamId]));
 			kernels->insert(ValueType(str, streams[streamId]));
 		}
 
 		streamId = (streamId+1) % numOfStreams;
-	}
+	}*/
 
 	/*for(SharedMap::iterator iter = kernels->begin(); iter != kernels->end(); iter++)
 	{
 		printf("%s --- %s\n", iter->first.data(), iter->second);
 	}*/
 
+	char message[20];
+	int myrank, tag=99;
+	MPI_Status status;
 
-	std::vector<std::future<void>> vec;
-	//for(Application app : commands){
-	for(int k = 0; k < commands.size(); k++ ){
-		std::cout << commands[k].command << "\n";
-		//exec(app.command.data());
-		vec.push_back(std::async(std::launch::async,exec,commands[k].command.data()));
+	/* Initialize the MPI library */
+	MPI_Init(&argc, &argv);
+	/* Determine unique id of the calling process of all processes participating
+	   in this MPI program. This id is usually called MPI rank. */
+	MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+
+	if (myrank == 0) {
+		strcpy(message, "Hello, there");
+		/* Send the message "Hello, there" from the process with rank 0 to the
+		   process with rank 1. */
+		MPI_Send(message, strlen(message)+1, MPI_CHAR, 1, tag, MPI_COMM_WORLD);
+	} else {
+		/* Receive a message with a maximum length of 20 characters from process
+		   with rank 0. */
+		MPI_Recv(message, 20, MPI_CHAR, 0, tag, MPI_COMM_WORLD, &status);
+		printf("received %s\n", message);
 	}
 
+	/* Finalize the MPI library to free resources acquired by it. */
+	MPI_Finalize();
+
+
+	/*int nstreams = 4;
+	omp_set_num_threads(nstreams);
+	#pragma omp parallel
+	{
+		uint id = omp_get_thread_num(); //cpu_thread_id
+		for (int i = 0; i < commands.size(); i+=nstreams) {
+			uint k = i + id;
+			std::cout << commands[k].command << "\n";
+			exec(commands[k].command.data());
+		}
+	}*/
+
+		//vec.push_back(std::async(std::launch::async,exec,commands[k].command.data()));
+	//}
+
 	for(auto& k : vec){
-		k.get();
+		//k.get();
 	}
 
 

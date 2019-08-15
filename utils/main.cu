@@ -50,6 +50,8 @@ void exec(const char* s){
 
 int main(int argc, char **argv) {
 
+	//printf("argc=%d", argc);
+
 	bip::shared_memory_object::remove("shared_memory");
 	bip::managed_shared_memory segment(boost::interprocess::create_only, "shared_memory", 65536);
 
@@ -63,8 +65,9 @@ int main(int argc, char **argv) {
 	        , segment.get_allocator<SharedMap>());
 
 
+	//printf("file=%s\n", argv[1]);
 	std::ofstream f_out;
-	f_out.open("kernels.txt", std::ios::app);
+	f_out.open(argv[1], std::ios::app);
 
 	std::string line = "";
 	std::getline(std::cin, line);
@@ -77,7 +80,7 @@ int main(int argc, char **argv) {
 		//printf("%d %s %f\n", iter->second.id, iter->first.data(), iter->second.microseconds);
 		f_out << iter->second.id << " " << iter->first.data() << " " << iter->second.microseconds << "\n";
 	}
-	f_out << "\n";
+	//f_out << "\n";
 	f_out.close();
 	//callcudahook(2);
 

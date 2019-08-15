@@ -21,7 +21,10 @@ OPENCL_INC = -I $(CLDIR)/include
 all: scheduler.o libcudahook.so main.exe #libclhook.so
 endif
 
-COMMONFLAGS=-Wall -fPIC -shared -ldl
+COMMONFLAGS=-Wall -fPIC -shared -ldl -fopenmp
+
+mpi: mpi.cpp
+	nvcc -ccbin mpic++ mpi.cpp -o mpi.exe -std=c++11 -I/usr/local/cuda-8.0/include -lcudart
 
 scheduler.o: Scheduler.cpp
 	$(CXX) $(COMMONFLAGS) -o scheduler.o -c Scheduler.cpp -std=c++11
@@ -42,7 +45,7 @@ libclhook.so: clhook.cpp
 #	nvcc $(arch) $+ -o $@ -I"../lib" -std=c++11 --expt-extended-lambda -lcudart -DELAPSED_TIME=$(TIME) -DEXECUTIONS=$(EXECS)
 
 main.exe: main.cu scheduler.o
-	nvcc $(arch) $+ -o $@ -I"../lib" -std=c++11 --expt-extended-lambda -lcudart -DELAPSED_TIME=$(TIME) -DEXECUTIONS=$(EXECS)	
+	nvcc -ccbin g++ -Xcompiler -fopenmp $(arch) $+ -o $@ -I"../lib" -std=c++11 --expt-extended-lambda -lcudart -DELAPSED_TIME=$(TIME) -DEXECUTIONS=$(EXECS)
 
 libclhook.dylib: clhook.cpp
 	$(CXX) $(OPENCL_INC) $(OPENCL_LIB) -Wall -dynamiclib -o libclhook.dylib clhook.cpp

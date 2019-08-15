@@ -1,0 +1,12 @@
+
+# Ativar concorrência de processos
+export CUDA_VISIBLE_DEVICES=0
+export CUDA_MPS_PIPE_DIRECTORY=/tmp/nvidia-mps
+export CUDA_MPS_LOG_DIRECTORY=/tmp/nvidia-log
+nvidia-cuda-mps-control -d
+
+# Profile Application
+nvprof --profile-child-processes -fo kernel%p.nvvp mpirun -np 8 ./mpi.exe
+
+# Quit concorrência de processos
+echo "quit" | nvidia-cuda-mps-control

@@ -81,10 +81,11 @@ std::vector<deviceInfo_t> &devices() {
 typedef bip::allocator<char, bip::managed_shared_memory::segment_manager> CharAllocator;
 typedef bip::basic_string<char, std::char_traits<char>, CharAllocator> ShmemString;
 
-typedef bip::allocator<cudaStream_t, bip::managed_shared_memory::segment_manager> StreamAllocator;
+//typedef bip::allocator<cudaStream_t, bip::managed_shared_memory::segment_manager> StreamAllocator;
+//typedef bip::basic_string<char, std::char_traits<char>, CharAllocator> ShmemString;
 
 typedef ShmemString MapKey;
-typedef cudaStream_t& MapValue;
+typedef cudaStream_t MapValue;
 
 typedef std::pair< MapKey, MapValue> ValueType;
 

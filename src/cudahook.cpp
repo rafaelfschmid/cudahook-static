@@ -186,6 +186,8 @@ extern "C" cudaError_t cudaConfigureCall(dim3 gridDim, dim3 blockDim, size_t sha
 	SharedMap* kernels = segment.find<SharedMap>("Kernels").first;
 	cudaStream_t* streams = segment.find<cudaStream_t>("Streams").first;
 
+	cudaStream_t teste;
+	cudaStreamCreate(&teste);
 	/*for(SharedMap::iterator iter = kernels->begin(); iter != kernels->end(); iter++)
 	{
 		printf("%s --- %s\n", iter->first.data(), iter->second);
@@ -195,11 +197,14 @@ extern "C" cudaError_t cudaConfigureCall(dim3 gridDim, dim3 blockDim, size_t sha
 	int* 	   index 	= segment.find<int>("Index").first;
 	int id = *index = (*index) + 1;
 
-	std::string s(kernelName() + std::to_string(id));
-	CharAllocator alloc(segment.get_allocator<char>());
-	ShmemString str(s.data(), alloc);
 
-	cudaStream_t aux = kernels->at(str);
+	//std::string s(kernelName() + std::to_string(id));
+	std::string s(kernelName());
+	printf("kernelid=%s\n", s.data());
+	//CharAllocator alloc(segment.get_allocator<char>());
+	//ShmemString str(s.data(), alloc);
+
+	//cudaStream_t aux = kernels->at(str);
 	//cudaStream_t aux = kernels->at(str);
 	//ShmemString str(s.data(), alloc);
 	//kernels->insert(ValueType(str, k));
@@ -209,8 +214,9 @@ extern "C" cudaError_t cudaConfigureCall(dim3 gridDim, dim3 blockDim, size_t sha
 
 	assert(realCudaConfigureCall != NULL && "cudaConfigureCall is null");
 
-	//return realCudaConfigureCall(gridDim, blockDim, sharedMem, stream);
-	return realCudaConfigureCall(gridDim, blockDim, sharedMem, aux);
+	//return realCudaConfigureCall(gridDim, blockDim, sharedMem, teste);
+	//return realCudaConfigureCall(gridDim, blockDim, sharedMem, *streams);
+	return realCudaConfigureCall(gridDim, blockDim, sharedMem, stream);
 
 }
 

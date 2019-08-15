@@ -11,6 +11,7 @@ Consideracoes.ods
 *~
 *.nvvp
 *.nvprof
+*.out
 /Debug/
 .cproject
 .project

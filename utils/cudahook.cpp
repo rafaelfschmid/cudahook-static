@@ -238,7 +238,8 @@ extern "C" cudaError_t cudaLaunch(const char *entry) {
 	k.microseconds = (float)microseconds.count();
 
 	CharAllocator alloc(segment.get_allocator<char>());
-	std::string s(kernelsMap()[entry] + std::to_string(k.id));
+	//std::string s(kernelsMap()[entry] + std::to_string(k.id));
+	std::string s(kernelsMap()[entry]);
 	ShmemString str(s.data(), alloc);
 	kernels->insert(ValueType(str, k));
 
